@@ -1,4 +1,5 @@
 (function () {
+  let focusReady = false;
   // ---------- UI language (chrome only — not vocab/grammar content) ----------
   const LANG_KEY = "jpstudy_lang_v1";
   let currentLang = "en";
@@ -192,7 +193,7 @@
   // "Weak" = the last time you sat down with this word, you didn't get both
   // reps right. Clears the moment you master it in a later sitting.
   function isWeak(item) {
-    return !!getStats(item).weak;
+    return !!(getStats(item).manualWeak || getStats(item).weak);
   }
   // "Mastered" = the last time you sat down with this word, you got both
   // reps right.
@@ -547,6 +548,7 @@
       backTextEl.textContent = item.word;
       backReadingEl.textContent = item.reading;
     }
+    refreshFocus();
   }
 
   function resetCardVisual() {
@@ -574,6 +576,7 @@
     if (!fc.current) {
       frontTextEl.textContent = flashcardEmptyText();
     }
+    refreshFocus();
   }
 
   // Redraws the CURRENT card (e.g. after a direction toggle) without
@@ -754,7 +757,7 @@ resetProgressBtn.addEventListener("click", () => {
     // Overwrite only the selected words with 0s and a new timestamp
     targetItems.forEach(item => {
       const id = wordId(item);
-      progressStore[id] = { correct: 0, wrong: 0, streak: 0, lastSeen: now };
+      progressStore[id] = { correct: 0, wrong: 0, streak: 0, manualWeak: false, weakEditedAt: now, lastSeen: now };
     });
 
     saveProgress();
@@ -790,6 +793,7 @@ resetProgressBtn.addEventListener("click", () => {
   });
 
   document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, select, textarea, button, [contenteditable]")) return;
     if (!document.getElementById("vocab-view").classList.contains("active")) return;
     if (!document.getElementById("flashcards-subview").classList.contains("active")) return;
     const fc = state.flashcards;
@@ -1360,8 +1364,9 @@ resetProgressBtn.addEventListener("click", () => {
   const grammarListEl = document.getElementById("grammar-list");
   const grammarDetailEl = document.getElementById("grammar-detail");
 
-  function renderGrammarList(level) {
-    const items = (window.GRAMMAR_DATA && window.GRAMMAR_DATA[level]) || [];
+  function renderGrammarList(level, lesson) {
+    const allItems = (window.GRAMMAR_DATA && window.GRAMMAR_DATA[level]) || [];
+    const items = lesson === undefined ? allItems : allItems.filter(i => i.lesson === lesson);
     state.grammar.items = items;
     state.grammar.selectedIndex = null;
     grammarListEl.innerHTML = "";
@@ -3467,4 +3472,187 @@ resetProgressBtn.addEventListener("click", () => {
   });
 
   applyTranslations();
+  // Keep the original stores and sync protocol, with a smaller study surface.
+  // Manual weak marks are deliberately independent of automatic quiz results.
+  function refreshFocus() {
+    if (!focusReady) return;
+    const fc = state.flashcards;
+    const titles = (window.VOCAB_LESSONS || {})[fc.level] || {};
+    const lessons = [...new Set((window.VOCAB_DATA[fc.level] || []).map(i => i.lesson))].filter(n => n !== undefined).sort((a,b) => a-b);
+    const selected = fc.lessons[0];
+    const key = `vocab:${fc.level}:${selected}`;
+    const done = !!planDone[key];
+    const picker = document.getElementById("focus-lesson");
+    picker.replaceChildren(...lessons.map(n => {
+      const option = document.createElement("option");
+      option.value = n;
+      option.textContent = `${planDone[`vocab:${fc.level}:${n}`] ? '✓ ' : ''}Lesson ${n}${titles[n] ? ' · ' + titles[n] : ''}`;
+      return option;
+    }));
+    picker.value = selected;
+    document.getElementById("focus-title").textContent = `${fc.level} · Lesson ${selected}${titles[selected] ? ' — ' + titles[selected] : ''}`;
+    const items = buildDeck(fc.level, fc.lessons, false);
+    const weakCount = items.filter(isWeak).length;
+    document.getElementById("focus-count").textContent = `${items.length} words · ${weakCount} weak`;
+    const doneBtn = document.getElementById("focus-done");
+    doneBtn.textContent = done ? "✓ Lesson done · undo" : "Mark lesson done";
+    doneBtn.setAttribute("aria-pressed", String(done));
+    const weakBtn = document.getElementById("focus-weak");
+    const weak = fc.current && isWeak(fc.current);
+    weakBtn.disabled = !fc.current;
+    weakBtn.textContent = weak ? "★ Weak word · remove" : "☆ Mark weak";
+    weakBtn.setAttribute("aria-pressed", String(!!weak));
+    isolateNoteEl.textContent = "Your tricky words, together. Manually marked words stay here until you remove the mark.";
+    document.getElementById("focus-lessons-count").textContent = `${lessons.filter(n => planDone[`vocab:${fc.level}:${n}`]).length} / ${lessons.length} done`;
+    const list = document.getElementById("focus-lesson-list");
+    list.replaceChildren(...lessons.map(n => {
+      const button = document.createElement("button");
+      const complete = !!planDone[`vocab:${fc.level}:${n}`];
+      button.className = "focus-lesson" + (complete ? " is-done" : "");
+      button.setAttribute("aria-current", String(n === selected));
+      button.textContent = `Lesson ${n}${complete ? '  ✓ Done' : '  →'}`;
+      button.title = titles[n] || `Lesson ${n}`;
+      button.addEventListener("click", () => { chooseFocusLesson(n); cardEl.scrollIntoView({behavior:"smooth",block:"center"}); });
+      return button;
+    }));
+  }
+  function chooseFocusLesson(n) {
+    state.flashcards.lessons = [Number(n)];
+    renderLessonChips(state.flashcards.level);
+    try { localStorage.setItem("jpstudy_focus_selection_v1", JSON.stringify({level:state.flashcards.level, lesson:Number(n)})); } catch(e) {}
+    startSession();
+    animateFocus(document.querySelector('.focus-session'));
+  }
+  function animateFocus(element, celebrate) {
+    if (!element || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    element.animate([{scale:1},{scale:1.035},{scale:1}], {duration:360,easing:'ease-out'});
+    if (!celebrate) return;
+    const rect = element.getBoundingClientRect();
+    for (let i=0;i<8;i++) {
+      const spark = document.createElement('span');
+      spark.className = 'focus-spark';
+      spark.setAttribute('aria-hidden','true');
+      spark.textContent = i % 2 ? '✦' : '·';
+      spark.style.left = `${rect.left + rect.width/2 + window.scrollX}px`;
+      spark.style.top = `${rect.top + rect.height/2 + window.scrollY}px`;
+      const angle = i * Math.PI/4;
+      spark.style.setProperty('--spark-x', `${Math.cos(angle)*75}px`);
+      spark.style.setProperty('--spark-y', `${Math.sin(angle)*45-22}px`);
+      document.body.append(spark);
+      setTimeout(()=>spark.remove(),900);
+    }
+  }
+  if (document.getElementById("focus-level")) {
+    const levelSelect = document.getElementById("focus-level");
+    const levels = Object.keys(window.VOCAB_DATA).filter(l => window.VOCAB_DATA[l].length);
+    levelSelect.replaceChildren(...levels.map(l => { const o=document.createElement("option"); o.value=l; o.textContent=l; return o; }));
+    let selection = {};
+    try { selection = JSON.parse(localStorage.getItem("jpstudy_focus_selection_v1") || "{}"); } catch(e) {}
+    const level = levels.includes(selection?.level) ? selection.level : (levels.includes("N3") ? "N3" : levels[0]);
+    state.flashcards.level = level;
+    levelSelect.value = level;
+    const nums = [...new Set(window.VOCAB_DATA[level].map(i => i.lesson))].sort((a,b)=>a-b);
+    state.flashcards.lessons = [nums.includes(selection?.lesson) ? selection.lesson : nums[0]];
+    levelSelect.addEventListener("change", () => {
+      state.flashcards.level = levelSelect.value;
+      const nums = [...new Set(window.VOCAB_DATA[levelSelect.value].map(i => i.lesson))].sort((a,b)=>a-b);
+      chooseFocusLesson(nums[0]);
+    });
+    document.getElementById("focus-lesson").addEventListener("change", e => chooseFocusLesson(e.target.value));
+    document.getElementById("focus-done").addEventListener("click", e => {
+      const fc = state.flashcards;
+      const key = `vocab:${fc.level}:${fc.lessons[0]}`;
+      const wasDone = !!planDone[key];
+      if (wasDone) delete planDone[key]; else planDone[key] = todayISO();
+      markPlanEdit("done", key);
+      savePlanDone();
+      refreshFocus();
+      if (!wasDone) { e.currentTarget.classList.remove("focus-celebrate"); void e.currentTarget.offsetWidth; e.currentTarget.classList.add("focus-celebrate"); }
+      if (!wasDone) animateFocus(e.currentTarget, true);
+    });
+    document.getElementById("focus-weak").addEventListener("click", () => {
+      const item = state.flashcards.current;
+      if (!item) return;
+      const stats = {...getStats(item)};
+      const remove = isWeak(item);
+      stats.manualWeak = !remove;
+      if (remove) stats.weak = false;
+      stats.lastSeen = new Date().toISOString();
+      stats.weakEditedAt = stats.lastSeen;
+      progressStore[wordId(item)] = stats;
+      saveProgress();
+      refreshWordList();
+      refreshFocus();
+      animateFocus(document.getElementById('focus-weak'), !remove);
+    });
+    // Cloud updates also refresh the manual completion controls.
+    syncContributors.push({get:()=>({}),apply:()=>refreshFocus()});
+    focusReady = true;
+    const main = document.querySelector('main');
+    main.prepend(document.querySelector('.study-intro'));
+    const focusNav = document.querySelector('.focus-nav');
+    focusNav.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
+      const page = button.dataset.focusPage;
+      focusNav.querySelectorAll('button').forEach(b => { b.classList.toggle('active', b === button); b.setAttribute('aria-current', b === button ? 'page' : 'false'); });
+      goTo(page === 'grammar' ? 'grammar' : 'vocab', page === 'grammar' ? 'grammar' : page);
+      document.querySelector('.study-intro h1').textContent = page === 'grammar' ? 'A little more understanding.' : 'One lesson at a time.';
+      document.querySelector('.study-intro>p:last-child').textContent = page === 'grammar' ? 'Read a pattern. Try it out. Let it click.' : 'Flip a card. Keep the tricky words close. Make a little progress.';
+    }));
+    const grammarLevel = document.getElementById('focus-grammar-level');
+    const grammarLesson = document.getElementById('focus-grammar-lesson');
+    const grammarDone = document.getElementById('focus-grammar-done');
+    function refreshGrammarDone() {
+      const done = !!planDone[`grammar:${grammarLevel.value}:${grammarLesson.value}`];
+      grammarDone.textContent = done ? '✓ Lesson done · undo' : 'Mark lesson done';
+      grammarDone.setAttribute('aria-pressed', String(done));
+      Array.from(grammarLesson.options).forEach(o => { o.textContent = `${planDone[`grammar:${grammarLevel.value}:${o.value}`] ? '✓ ' : ''}Lesson ${o.value}`; });
+    }
+    function chooseGrammarLesson() {
+      const level = grammarLevel.value, lesson = Number(grammarLesson.value);
+      renderGrammarList(level, lesson);
+      if (state.grammar.items.length) selectGrammarItem(0);
+      state.grammarPractice.level = level;
+      state.grammarPractice.lessons = [lesson];
+      gpRenderLessonChips(level);
+      gpStartSession();
+      const available = gpLessonsFor(level).includes(lesson);
+      document.querySelector('#grammar-subnav [data-subview="grammarpractice"]').disabled = !available;
+      document.querySelector('#grammar-subnav [data-subview="grammarpractice"]').title = available ? 'Try this lesson’s questions' : 'Practice questions have not been added for this lesson yet';
+      if (!available) document.querySelector('#grammar-subnav [data-subview="grammar"]').click();
+      refreshGrammarDone();
+      try { localStorage.setItem('jpstudy_focus_grammar_v1', JSON.stringify({level,lesson})); } catch(e) {}
+    }
+    function populateGrammarLessons(wanted) {
+      const nums = [...new Set((window.GRAMMAR_DATA[grammarLevel.value] || []).map(i => i.lesson))].filter(n=>n!==undefined).sort((a,b)=>a-b);
+      grammarLesson.replaceChildren(...nums.map(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=`Lesson ${n}`; return o; }));
+      grammarLesson.value = nums.includes(wanted) ? wanted : nums[0];
+      chooseGrammarLesson();
+    }
+    let grammarSelection = {};
+    try { grammarSelection = JSON.parse(localStorage.getItem('jpstudy_focus_grammar_v1') || '{}'); } catch(e) {}
+    if (['N4','N3'].includes(grammarSelection?.level)) grammarLevel.value = grammarSelection.level;
+    grammarLevel.addEventListener('change',()=>populateGrammarLessons());
+    grammarLesson.addEventListener('change',chooseGrammarLesson);
+    grammarDone.addEventListener('click',()=>{
+      const key=`grammar:${grammarLevel.value}:${grammarLesson.value}`;
+      const wasDone = !!planDone[key];
+      if (planDone[key]) delete planDone[key]; else planDone[key]=todayISO();
+      markPlanEdit('done',key); savePlanDone(); refreshGrammarDone();
+      if (!wasDone) animateFocus(grammarDone,true);
+    });
+    syncContributors.push({get:()=>({}),apply:()=>refreshGrammarDone()});
+    populateGrammarLessons(grammarSelection?.lesson);
+    const notesTab = document.querySelector('#grammar-subnav [data-subview="grammar"]');
+    notesTab.removeAttribute('data-i18n');
+    notesTab.textContent = 'Lesson notes';
+    document.querySelector('.brand-en').removeAttribute('data-i18n');
+    document.querySelector('.brand-en').textContent = "YOUR DAILY JAPANESE";
+    const studyTab = document.querySelector('#vocab-subnav [data-subview="flashcards"]');
+    studyTab.removeAttribute('data-i18n');
+    studyTab.textContent = "Study cards";
+    document.querySelector('#vocab-subnav [data-subview="wordlist"]').textContent = "Browse words";
+    document.querySelector('#vocab-subnav [data-subview="wordlist"]').removeAttribute('data-i18n');
+    goTo("vocab", "flashcards");
+    startSession();
+  }
 })();

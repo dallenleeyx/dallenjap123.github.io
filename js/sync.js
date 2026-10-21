@@ -204,6 +204,12 @@
         // Initial setup merge
         merged[id] = Object.assign({}, l, r);
       }
+      // Manual weak edits have their own clock: quiz results on another
+      // device must not silently discard a pinned word or undo its removal.
+      const manual = (r.weakEditedAt || "") > (l.weakEditedAt || "") ? r : l;
+      if (manual.weakEditedAt) {
+        merged[id] = { ...merged[id], manualWeak: !!manual.manualWeak, weakEditedAt: manual.weakEditedAt };
+      }
     });
     
     return merged;
