@@ -1,5 +1,26 @@
 # 日本語ノート — Japanese Study Site
 
+## Focus redesign
+
+The main interface now starts with **Study cards**, **Browse words**, and
+**Grammar**. Choose one level and lesson instead of building a multi-lesson
+deck. Grammar keeps lesson notes, examples, common mistakes, and practice with
+answer explanations. Lessons without questions keep their notes; their Practice
+button is disabled. The exam planner and extra drill modes are kept out of the
+main interface.
+
+**Mark weak** pins a flashcard to your weak pile until you remove the mark,
+independently of quiz results. **Mark lesson done** is a manual, reversible
+completion toggle for both vocab and grammar. Existing progress keys and cloud
+sync remain in use. The selected vocab and grammar lessons are remembered locally.
+
+The warm paper-and-matcha presentation is in `css/focus.css`, with dark mode,
+responsive controls, and reduced-motion support. Original study engines remain
+in place for compatibility with existing saved progress.
+
+The following sections describe the original engines and data formats; some
+older navigation and planner instructions are no longer exposed in the focus UI.
+
 A static site with three tabs — Home, Vocab and Grammar:
 
 **Home** is a study timeline built backwards from your exam date. See

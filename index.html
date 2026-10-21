@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/focus.css">
 </head>
-<body>
+<body class="focus-study">
   <header class="site-header">
     <div class="brand">
       <span class="brand-jp">日本語ノート</span>
@@ -40,6 +41,7 @@
   </header>
 
   <main>
+    <nav class="focus-nav" aria-label="Study navigation"><button data-focus-page="flashcards" class="active">Study cards</button><button data-focus-page="wordlist">Browse words</button><button data-focus-page="grammar">Grammar</button></nav>
     <section id="home-view" class="view active">
       <div class="tl-countdown">
         <div class="tl-count-card tl-count-exam">
@@ -115,6 +117,7 @@
     </section>
 
     <section id="vocab-view" class="view">
+      <div class="study-intro"><p class="eyebrow">A LITTLE EVERY DAY</p><h1>One lesson at a time.</h1><p>Flip a card. Keep the tricky words close. Make a little progress.</p></div>
       <div class="subnav" id="vocab-subnav">
         <button class="subnav-btn active" data-subview="wordlist" data-i18n="tabWordlist">Word List</button>
         <button class="subnav-btn" data-subview="flashcards" data-i18n="tabFlashcards">Flashcards</button>
@@ -139,6 +142,12 @@
       </div>
 
       <div id="flashcards-subview" class="subview">
+        <div class="focus-picker">
+          <label>Level<select id="focus-level"></select></label>
+          <label class="focus-lesson-label">Lesson<select id="focus-lesson"></select></label>
+          <button id="focus-done" class="focus-done" aria-pressed="false">Mark lesson done</button>
+        </div>
+        <div class="focus-session"><div><span class="eyebrow">YOUR FLASHCARDS</span><h2 id="focus-title">A fresh start</h2></div><span id="focus-count"></span></div>
         <div class="controls">
           <div class="level-chips" id="fc-level-chips">
             <button class="chip active" data-level="all" data-i18n="all">All</button>
@@ -173,6 +182,7 @@
             </div>
           </button>
           <p class="card-hint" id="card-hint" data-i18n="cardHint">click the card, or press space, to flip</p>
+          <button id="focus-weak" class="ghost-btn focus-weak" aria-pressed="false">☆ Mark weak</button>
           <div class="grade-buttons" id="grade-buttons" hidden>
             <button class="grade-btn grade-wrong" id="grade-wrong" data-i18n="didntKnow">✗ didn't know</button>
             <button class="grade-btn grade-right" id="grade-right" data-i18n="knewIt">✓ knew it</button>
@@ -187,6 +197,8 @@
           <span id="fc-progress" class="progress">0 / 0</span>
         </div>
       </div>
+
+      <details class="focus-lessons"><summary>Your lessons <span id="focus-lessons-count"></span></summary><p>Choose a lesson to study. Use “Mark lesson done” when you’re ready.</p><div id="focus-lesson-list"></div></details>
 
       <div id="kanjiwrite-subview" class="subview">
         <div class="controls">
@@ -285,6 +297,11 @@
     </section>
 
     <section id="grammar-view" class="view">
+      <div class="focus-picker">
+        <label>Level<select id="focus-grammar-level"><option>N4</option><option selected>N3</option></select></label>
+        <label class="focus-lesson-label">Lesson<select id="focus-grammar-lesson"></select></label>
+        <button id="focus-grammar-done" class="focus-done" aria-pressed="false">Mark lesson done</button>
+      </div>
       <div class="subnav" id="grammar-subnav">
         <button class="subnav-btn active" data-subview="grammar" data-i18n="tabGrammar">Grammar</button>
         <button class="subnav-btn" data-subview="grammarpractice" data-i18n="tabGrammarPractice">Practice</button>
