@@ -3521,6 +3521,26 @@ resetProgressBtn.addEventListener("click", () => {
     renderLessonChips(state.flashcards.level);
     try { localStorage.setItem("jpstudy_focus_selection_v1", JSON.stringify({level:state.flashcards.level, lesson:Number(n)})); } catch(e) {}
     startSession();
+    animateFocus(document.querySelector('.focus-session'));
+  }
+  function animateFocus(element, celebrate) {
+    if (!element || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    element.animate([{scale:1},{scale:1.035},{scale:1}], {duration:360,easing:'ease-out'});
+    if (!celebrate) return;
+    const rect = element.getBoundingClientRect();
+    for (let i=0;i<8;i++) {
+      const spark = document.createElement('span');
+      spark.className = 'focus-spark';
+      spark.setAttribute('aria-hidden','true');
+      spark.textContent = i % 2 ? '✦' : '·';
+      spark.style.left = `${rect.left + rect.width/2 + window.scrollX}px`;
+      spark.style.top = `${rect.top + rect.height/2 + window.scrollY}px`;
+      const angle = i * Math.PI/4;
+      spark.style.setProperty('--spark-x', `${Math.cos(angle)*75}px`);
+      spark.style.setProperty('--spark-y', `${Math.sin(angle)*45-22}px`);
+      document.body.append(spark);
+      setTimeout(()=>spark.remove(),900);
+    }
   }
   if (document.getElementById("focus-level")) {
     const levelSelect = document.getElementById("focus-level");
@@ -3548,6 +3568,7 @@ resetProgressBtn.addEventListener("click", () => {
       savePlanDone();
       refreshFocus();
       if (!wasDone) { e.currentTarget.classList.remove("focus-celebrate"); void e.currentTarget.offsetWidth; e.currentTarget.classList.add("focus-celebrate"); }
+      if (!wasDone) animateFocus(e.currentTarget, true);
     });
     document.getElementById("focus-weak").addEventListener("click", () => {
       const item = state.flashcards.current;
@@ -3562,6 +3583,7 @@ resetProgressBtn.addEventListener("click", () => {
       saveProgress();
       refreshWordList();
       refreshFocus();
+      animateFocus(document.getElementById('focus-weak'), !remove);
     });
     // Cloud updates also refresh the manual completion controls.
     syncContributors.push({get:()=>({}),apply:()=>refreshFocus()});
@@ -3613,8 +3635,10 @@ resetProgressBtn.addEventListener("click", () => {
     grammarLesson.addEventListener('change',chooseGrammarLesson);
     grammarDone.addEventListener('click',()=>{
       const key=`grammar:${grammarLevel.value}:${grammarLesson.value}`;
+      const wasDone = !!planDone[key];
       if (planDone[key]) delete planDone[key]; else planDone[key]=todayISO();
       markPlanEdit('done',key); savePlanDone(); refreshGrammarDone();
+      if (!wasDone) animateFocus(grammarDone,true);
     });
     syncContributors.push({get:()=>({}),apply:()=>refreshGrammarDone()});
     populateGrammarLessons(grammarSelection?.lesson);

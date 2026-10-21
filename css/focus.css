@@ -78,3 +78,21 @@ body.focus-study { background:var(--paper); background-image:radial-gradient(var
 .focus-study .grammar-pattern { font-size:30px; }
 .focus-study .gp-option { border-radius:12px; }
 .focus-study .theme-picker { display:none; }
+
+/* Keep the 3D flip independent of the quicker button hover transition. */
+.focus-study .card { transition:transform .72s cubic-bezier(.22,.65,.28,1); will-change:transform; }
+.focus-study .card-stage { perspective:1800px; }
+.focus-study .card-face { -webkit-font-smoothing:antialiased; }
+.focus-study .card-refresh .card-front .card-text { animation:focus-word-in .42s cubic-bezier(.2,.7,.3,1) both; }
+.focus-study .view.active,.focus-study .subview.active { animation:focus-arrive .38s ease-out both; }
+.focus-study .grade-buttons:not([hidden]) { animation:focus-arrive .3s .2s ease-out both; }
+.focus-study .gp-feedback:not([hidden]) { animation:focus-arrive .35s ease-out both; }
+.focus-study .focus-lessons[open] #focus-lesson-list { animation:focus-arrive .3s ease-out both; }
+.focus-study .focus-nav button.active { animation:focus-tab-pop .32s ease-out; }
+.focus-spark { position:absolute; z-index:1000; pointer-events:none; color:var(--indigo); font-size:16px; animation:focus-sparkle .8s cubic-bezier(.15,.6,.3,1) both; }
+.focus-spark:nth-child(even) { color:var(--seal); }
+@keyframes focus-arrive { from { opacity:0; translate:0 8px; } to { opacity:1; translate:0 0; } }
+@keyframes focus-word-in { from { opacity:0; translate:0 10px; } to { opacity:1; translate:0 0; } }
+@keyframes focus-tab-pop { 50% { scale:1.04; } }
+@keyframes focus-sparkle { 0% { opacity:0; transform:translate(0,0) scale(.4) rotate(0); } 20% { opacity:1; } 100% { opacity:0; transform:translate(var(--spark-x),var(--spark-y)) scale(.8) rotate(100deg); } }
+@media(prefers-reduced-motion:reduce) { .focus-study .card { will-change:auto; } .focus-spark { display:none; } }
